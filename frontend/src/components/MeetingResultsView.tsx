@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { 
   FileText, Download, Copy, Check, BarChart3, Users, 
   Layers, CheckSquare, HelpCircle, Target, Sparkles, 
-  Clock, Calendar, Globe, AlertTriangle, ChevronRight, Hash, ArrowLeft
+  Clock, Calendar, Globe, AlertTriangle, ChevronRight, Hash, ArrowLeft, Printer
 } from 'lucide-react';
 import { 
   PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, 
@@ -10,6 +10,7 @@ import {
 } from 'recharts';
 import { MeetingDetail, SpeakerStat } from '../types';
 import { api } from '../services/api';
+import { MoMWhiteSheet } from './MoMWhiteSheet';
 
 interface MeetingResultsViewProps {
   meeting: MeetingDetail;
@@ -21,7 +22,7 @@ export const MeetingResultsView: React.FC<MeetingResultsViewProps> = ({
   onBackToHome,
 }) => {
   const [activeTab, setActiveTab] = useState<
-    'mom' | 'original' | 'english' | 'hindi' | 'speakers' | 'topics' | 'actions' | 'decisions' | 'datamining' | 'analytics'
+    'mom' | 'original' | 'english' | 'speakers' | 'topics' | 'actions' | 'decisions' | 'datamining' | 'analytics'
   >('mom');
   const [copied, setCopied] = useState(false);
 
@@ -33,13 +34,6 @@ export const MeetingResultsView: React.FC<MeetingResultsViewProps> = ({
   const analytics = meeting.analytics;
   const momDoc = meeting.mom_document;
   const summary = meeting.summary;
-  const speakerSummaryMap = (() => {
-    try {
-      return summary?.speaker_summaries_json ? JSON.parse(summary.speaker_summaries_json) : {};
-    } catch {
-      return {};
-    }
-  })();
 
   // Parse speaker stats from analytics
   const speakerStats: SpeakerStat[] = analytics?.speaker_stats_json
@@ -68,6 +62,10 @@ export const MeetingResultsView: React.FC<MeetingResultsViewProps> = ({
 
   const COLORS = ['#14b8a6', '#06b6d4', '#3b82f6', '#8b5cf6', '#ec4899', '#f59e0b', '#10b981'];
 
+  const handlePrintPDF = () => {
+    window.print();
+  };
+
   const handleCopyMarkdown = () => {
     if (momDoc?.markdown_content) {
       navigator.clipboard.writeText(momDoc.markdown_content);
@@ -88,8 +86,8 @@ export const MeetingResultsView: React.FC<MeetingResultsViewProps> = ({
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8 animate-in fade-in duration-300">
-      {/* Header Banner */}
-      <div className="bg-slate-900/90 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl space-y-6">
+      {/* Header Banner - Hidden during PDF Print */}
+      <div className="no-print bg-slate-900/90 border border-slate-800 rounded-3xl p-6 sm:p-8 shadow-2xl space-y-6">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div className="space-y-1">
             <button
@@ -123,33 +121,40 @@ export const MeetingResultsView: React.FC<MeetingResultsViewProps> = ({
             </p>
           </div>
 
-          {/* Action Buttons: Copy & Export */}
-          <div className="flex items-center gap-3">
+          {/* Action Buttons: PDF Download, Copy & Export */}
+          <div className="flex items-center gap-3 flex-wrap">
+            <button
+              onClick={handlePrintPDF}
+              className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-teal-500 to-emerald-500 hover:from-teal-400 hover:to-emerald-400 text-slate-950 font-extrabold text-xs shadow-lg shadow-teal-500/20 transition-all"
+            >
+              <Printer className="h-4 w-4" />
+              <span>Download PDF / Print</span>
+            </button>
+
             <button
               onClick={handleCopyMarkdown}
               className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-semibold transition-all shadow"
             >
               {copied ? <Check className="h-4 w-4 text-teal-400" /> : <Copy className="h-4 w-4" />}
-              <span>{copied ? 'Copied MoM!' : 'Copy MoM'}</span>
+              <span>{copied ? 'Copied MoM!' : 'Copy Text'}</span>
             </button>
 
             <button
               onClick={handleDownloadMarkdown}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-teal-500 hover:bg-teal-400 text-slate-950 text-xs font-bold transition-all shadow-lg shadow-teal-500/20"
+              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-semibold transition-all shadow"
             >
               <Download className="h-4 w-4" />
-              <span>Export .MD Document</span>
+              <span>Export .MD</span>
             </button>
           </div>
         </div>
 
-        {/* 10 Navigation Tabs */}
+        {/* Navigation Tabs */}
         <div className="flex overflow-x-auto border-b border-slate-800 pb-1 gap-1 text-xs font-semibold scrollbar-thin">
           {[
-            { id: 'mom', label: 'Minutes of Meeting (MoM)', icon: FileText },
+            { id: 'mom', label: 'Minutes of Meeting (White Sheet)', icon: FileText },
             { id: 'original', label: 'Original Transcript', icon: Globe },
             { id: 'english', label: 'English Version', icon: Globe },
-            { id: 'hindi', label: 'Hindi Version', icon: Globe },
             { id: 'speakers', label: 'Speaker Diarization', icon: Users },
             { id: 'topics', label: 'Topic Clusters', icon: Layers },
             { id: 'actions', label: `Action Items (${actionItems.length})`, icon: CheckSquare },
@@ -179,44 +184,23 @@ export const MeetingResultsView: React.FC<MeetingResultsViewProps> = ({
 
       {/* TAB CONTENT AREAS */}
 
-      {/* 1. MoM DOCUMENT TAB */}
+      {/* 1. MoM WHITE SHEET DOCUMENT TAB */}
       {activeTab === 'mom' && (
-        <div className="bg-slate-900/80 border border-slate-800 rounded-3xl p-8 shadow-xl space-y-6">
-          <div className="flex items-center justify-between pb-4 border-b border-slate-800">
-            <h2 className="text-lg font-bold text-white flex items-center gap-2">
-              <FileText className="h-5 w-5 text-teal-400" />
-              <span>Official Minutes of Meeting Document</span>
-            </h2>
-            <span className="text-xs text-slate-400">Structured according to Section 8 Specification</span>
+        <div className="space-y-4">
+          <div className="no-print flex items-center justify-between bg-slate-900/60 p-4 rounded-2xl border border-slate-800 text-xs text-slate-300">
+            <span className="flex items-center gap-2">
+              <FileText className="h-4 w-4 text-teal-400" />
+              <span>Viewing formatted corporate White Sheet document. Click <strong>Download PDF / Print</strong> to save as a professional PDF.</span>
+            </span>
+            <button
+              onClick={handlePrintPDF}
+              className="px-3.5 py-1.5 rounded-lg bg-teal-500 hover:bg-teal-400 text-slate-950 font-bold text-xs"
+            >
+              Print / Save PDF
+            </button>
           </div>
 
-          <div className="prose prose-invert max-w-none text-slate-300 text-sm leading-relaxed space-y-4 font-sans bg-slate-950 p-6 rounded-2xl border border-slate-800/80">
-            <pre className="whitespace-pre-wrap font-sans text-slate-200 leading-relaxed text-sm">
-              {momDoc?.markdown_content || 'MoM document is being generated...'}
-            </pre>
-          </div>
-
-          {Object.keys(speakerSummaryMap).length > 0 && (
-            <div className="bg-slate-950 border border-slate-800 rounded-2xl p-6 space-y-4">
-              <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-                <h3 className="text-lg font-bold text-white">Name-wise Speaker Summary</h3>
-                <span className="text-xs text-teal-400">{Object.keys(speakerSummaryMap).length} speakers</span>
-              </div>
-
-              <div className="space-y-4">
-                {Object.entries(speakerSummaryMap).map(([speakerName, points]) => (
-                  <div key={speakerName} className="rounded-xl border border-slate-800 bg-slate-900/70 p-4 space-y-2">
-                    <h4 className="text-sm font-bold text-teal-300">{speakerName}</h4>
-                    <ul className="list-disc list-inside space-y-1 text-sm text-slate-300">
-                      {(Array.isArray(points) ? points : [points]).map((point, idx) => (
-                        <li key={`${speakerName}-${idx}`}>{String(point).replace(/^\*\*|\*\*$/g, '')}</li>
-                      ))}
-                    </ul>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+          <MoMWhiteSheet meeting={meeting} />
         </div>
       )}
 
@@ -284,35 +268,7 @@ export const MeetingResultsView: React.FC<MeetingResultsViewProps> = ({
         </div>
       )}
 
-      {/* 4. HINDI VERSION TAB */}
-      {activeTab === 'hindi' && (
-        <div className="bg-slate-900/80 border border-slate-800 rounded-3xl p-8 shadow-xl space-y-4">
-          <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-            <div>
-              <h3 className="text-base font-bold text-white">Proper Hindi Transcript Version (हिंदी संस्करण)</h3>
-              <p className="text-xs text-slate-400">अनुवादित एवं संरचित हिंदी विवरण</p>
-            </div>
-          </div>
-
-          <div className="space-y-3">
-            {segments.map((s, idx) => (
-              <div key={idx} className="p-4 rounded-xl bg-slate-950 border border-slate-800 space-y-1.5">
-                <div className="flex items-center justify-between text-xs">
-                  <span className="font-semibold text-amber-300 px-2 py-0.5 rounded bg-amber-500/10 border border-amber-500/30">
-                    {s.speaker_name}
-                  </span>
-                  <span className="text-[10px] font-mono text-slate-500">
-                    {formatTime(s.start_time)} - {formatTime(s.end_time)}
-                  </span>
-                </div>
-                <p className="text-sm text-slate-200">{s.hindi_text || s.original_text}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* 5. SPEAKER DIARIZATION TAB */}
+      {/* 4. SPEAKER DIARIZATION TAB */}
       {activeTab === 'speakers' && (
         <div className="bg-slate-900/80 border border-slate-800 rounded-3xl p-8 shadow-xl space-y-8">
           <div className="space-y-1">
@@ -535,7 +491,6 @@ export const MeetingResultsView: React.FC<MeetingResultsViewProps> = ({
             <p className="text-xs text-slate-400">Detailed inspection of analytical filtering, entity extraction, and anomaly detection</p>
           </div>
 
-          {/* Outliers Table */}
           <div className="space-y-3">
             <h4 className="text-xs font-bold uppercase tracking-wider text-slate-300">Outlier & Anomaly Detection (IsolationForest)</h4>
             <div className="space-y-2">
@@ -609,7 +564,7 @@ export const MeetingResultsView: React.FC<MeetingResultsViewProps> = ({
                       cx="50%"
                       cy="50%"
                       outerRadius={80}
-                      label={(entry) => `${entry.name} (${entry.value}%)`}
+                      label={(entry: any) => `${entry.name || 'Language'} (${entry.value}%)`}
                     >
                       <Cell fill="#14b8a6" />
                       <Cell fill="#f59e0b" />

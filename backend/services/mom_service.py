@@ -176,7 +176,7 @@ class MoMService:
                 )
                 db.add(ai)
                 action_items_list.append(ai)
-                speaker_contributions[speaker].append(f"**Task Assigned:** {ai.task} (Owner: {ai.assigned_to}, Deadline: {ai.deadline})")
+                speaker_contributions[speaker].append(f"Task Assigned: {ai.task} (Owner: {ai.assigned_to}, Deadline: {ai.deadline})")
 
             elif seg.segment_type == "Decision":
                 dec = Decision(
@@ -187,7 +187,7 @@ class MoMService:
                 )
                 db.add(dec)
                 decisions_list.append(dec)
-                speaker_contributions[speaker].append(f"**Key Decision:** {dec.decision_text}")
+                speaker_contributions[speaker].append(f"Key Decision: {dec.decision_text}")
 
             elif seg.segment_type == "Question":
                 q = Question(
@@ -199,7 +199,7 @@ class MoMService:
                 )
                 db.add(q)
                 questions_list.append(q)
-                speaker_contributions[speaker].append(f"**Inquiry Raised:** {q.question_text}")
+                speaker_contributions[speaker].append(f"Inquiry Raised: {q.question_text}")
 
             else:
                 speaker_contributions[speaker].append(cleaned_summary_point)
@@ -222,16 +222,16 @@ class MoMService:
         main_topics_str = ", ".join([t["topic_name"] for t in topics_extracted[:3]]) if topics_extracted else "Project Planning and Deliverables"
 
         overall_summary = (
-            f"The meeting focused on key discussions regarding **{main_topics_str}**. "
-            f"A total of **{num_segs} key dialogue turns** were logged across **{len(speakers_set)} active speaker(s)** ({speakers_list_str}). "
-            f"The team finalized **{len(decisions_list)} strategic decision(s)** and assigned **{len(action_items_list)} prioritized action item(s)** to ensure project alignment and timely execution."
+            f"The meeting focused on key discussions regarding {main_topics_str}. "
+            f"A total of {num_segs} key dialogue turns were logged across {len(speakers_set)} active speaker(s) ({speakers_list_str}). "
+            f"The team finalized {len(decisions_list)} strategic decision(s) and assigned {len(action_items_list)} prioritized action item(s) to ensure project alignment and timely execution."
         )
 
         english_summary = overall_summary
         hindi_summary = (
-            f"बैठक में मुख्य रूप से **{main_topics_str}** से संबंधित विषयों पर चर्चा की गई। "
-            f"सत्र के दौरान कुल **{len(speakers_set)} वक्ताओं** ({speakers_list_str}) के **{num_segs} संवाद** दर्ज किए गए। "
-            f"बैठक में **{len(decisions_list)} महत्वपूर्ण निर्णय** लिए गए तथा **{len(action_items_list)} कार्य बिंदु** निर्धारित समय सीमा के साथ सौंपे गए।"
+            f"बैठक में मुख्य रूप से {main_topics_str} से संबंधित विषयों पर चर्चा की गई। "
+            f"सत्र के दौरान कुल {len(speakers_set)} वक्ताओं ({speakers_list_str}) के {num_segs} संवाद दर्ज किए गए। "
+            f"बैठक में {len(decisions_list)} महत्वपूर्ण निर्णय लिए गए तथा {len(action_items_list)} कार्य बिंदु निर्धारित समय सीमा के साथ सौंपे गए।"
         )
 
         summary_obj = db.query(MeetingSummary).filter(MeetingSummary.meeting_id == meeting_id).first()
