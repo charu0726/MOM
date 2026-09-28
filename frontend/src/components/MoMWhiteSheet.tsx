@@ -23,10 +23,64 @@ export const MoMWhiteSheet: React.FC<MoMWhiteSheetProps> = ({ meeting }) => {
   const summary = meeting.summary;
   const analytics = meeting.analytics;
 
-  const durationMin = Math.round((analytics?.duration_seconds || (segments.length > 0 ? (segments[segments.length - 1].end_time - segments[0].start_time) : 120)) / 60);
-  const meetingDate = meeting.started_at 
-    ? new Date(meeting.started_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })
-    : new Date(meeting.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+  // Accurate local meeting date and time formatting (Laptop's local timezone)
+  const getLocalDateString = (isoString?: string) => {
+    if (!isoString) {
+      return new Date().toLocaleDateString(undefined, {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
+      });
+    }
+    const normalized = isoString.endsWith('Z') || isoString.includes('+') ? isoString : `${isoString}Z`;
+    const d = new Date(normalized);
+    if (isNaN(d.getTime())) {
+      const fallback = new Date(isoString);
+      return isNaN(fallback.getTime()) ? isoString : fallback.toLocaleDateString(undefined, {
+        year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit'
+      });
+    }
+    return d.toLocaleDateString(undefined, {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit'
+    });
+  };
+
+  const meetingDate = getLocalDateString(meeting.started_at || meeting.created_at);
+
+  // Accurate duration calculation
+  const calcDurationSeconds = (): number => {
+    if (analytics?.duration_seconds && analytics.duration_seconds > 0) {
+      return analytics.duration_seconds;
+    }
+    if (meeting.started_at && meeting.ended_at) {
+      const startMs = new Date(meeting.started_at.endsWith('Z') ? meeting.started_at : `${meeting.started_at}Z`).getTime();
+      const endMs = new Date(meeting.ended_at.endsWith('Z') ? meeting.ended_at : `${meeting.ended_at}Z`).getTime();
+      if (!isNaN(startMs) && !isNaN(endMs) && endMs > startMs) {
+        return (endMs - startMs) / 1000;
+      }
+    }
+    if (segments.length > 0) {
+      return Math.max(1, segments[segments.length - 1].end_time - segments[0].start_time);
+    }
+    return 0;
+  };
+
+  const totalSecs = Math.round(calcDurationSeconds());
+  const formatDurationDisplay = (secs: number): string => {
+    if (secs < 60) return `${Math.max(1, secs)} Seconds`;
+    const m = Math.floor(secs / 60);
+    const s = secs % 60;
+    return s > 0 ? `${m} Min ${s} Sec` : `${m} Minutes`;
+  };
+  const durationDisplay = formatDurationDisplay(totalSecs);
 
   // Group speaker contributions from segments
   const speakerContributions: { [key: string]: string[] } = {};
@@ -82,7 +136,7 @@ export const MoMWhiteSheet: React.FC<MoMWhiteSheetProps> = ({ meeting }) => {
           </div>
           <div>
             <span className="text-slate-500 font-medium block text-[10px] uppercase">Duration</span>
-            <strong className="text-slate-800 font-semibold">{durationMin || 2} Minutes</strong>
+            <strong className="text-slate-800 font-semibold">{durationDisplay}</strong>
           </div>
           <div>
             <span className="text-slate-500 font-medium block text-[10px] uppercase">Total Speakers</span>

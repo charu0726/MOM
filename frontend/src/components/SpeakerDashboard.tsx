@@ -7,6 +7,8 @@ import {
 import { api } from '../services/api';
 import { MeetingDetail, TranscriptSegment, Participant, SpeakerProfile } from '../types';
 
+import { WavAudioRecorder } from '../utils/wavRecorder';
+
 interface SpeakerDashboardProps {
   meeting: MeetingDetail;
   hostName: string;
@@ -55,6 +57,7 @@ export const SpeakerDashboard: React.FC<SpeakerDashboardProps> = ({
   const audioStreamRef = useRef<MediaStream | null>(null);
   const isRecordingRef = useRef<boolean>(false);
   const currentSpeakerRef = useRef<string>(hostName || 'Host');
+  const wavRecorderRef = useRef<WavAudioRecorder | null>(null);
 
   useEffect(() => {
     currentSpeakerRef.current = activeSpeakerName;
@@ -174,10 +177,13 @@ export const SpeakerDashboard: React.FC<SpeakerDashboardProps> = ({
     }
   };
 
-  // 3. MICROPHONE & SPEECH RECOGNITION PIPELINE
+  // 3. MICROPHONE & AUTOMATIC SPEECH RECOGNITION PIPELINE
   const startMicrophone = async () => {
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      // Start 16kHz PCM WAV Audio Recorder with 10-second sliding buffer
+      const wavRecorder = new WavAudioRecorder(10);
+      wavRecorderRef.current = wavRecorder;
+      const stream = await wavRecorder.start();
       audioStreamRef.current = stream;
       setIsMicActive(true);
 
@@ -233,9 +239,13 @@ export const SpeakerDashboard: React.FC<SpeakerDashboardProps> = ({
             if (event.results[i].isFinal) {
               if (transcript.length > 0) {
                 setInterimText('');
-                // Send finalized utterance with the currently active speaker
+                // Collect clean 16kHz PCM WAV chunk for acoustic diarization
+                const wavBlob = wavRecorderRef.current?.getWavBlob(5) || undefined;
+                wavRecorderRef.current?.clearBuffer();
+
                 try {
-                  const seg = await api.addSegment(meeting.code, transcript, currentSpeakerRef.current);
+                  // Send to backend without forcing manual speaker: backend extracts acoustic embedding and assigns Speaker 1, Speaker 2, Charu, Bhavya, etc. automatically
+                  const seg = await api.addSegment(meeting.code, transcript, undefined, wavBlob);
                   setSegments((prev) => {
                     if (prev.some(s => s.id === seg.id)) return prev;
                     return [...prev, seg];
@@ -275,6 +285,12 @@ export const SpeakerDashboard: React.FC<SpeakerDashboardProps> = ({
 
   const stopMicrophone = () => {
     setIsMicActive(false);
+    if (wavRecorderRef.current) {
+      try {
+        wavRecorderRef.current.stop();
+      } catch (e) {}
+      wavRecorderRef.current = null;
+    }
     if (recognitionRef.current) {
       try {
         recognitionRef.current.stop();
@@ -456,72 +472,26 @@ export const SpeakerDashboard: React.FC<SpeakerDashboardProps> = ({
         </div>
       )}
 
-      {/* QUICK SPEAKER SELECTION & SWITCHER BAR */}
-      <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4 shadow-md space-y-2">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 text-xs font-bold text-slate-300">
-            <UserCheck className="h-4 w-4 text-teal-400" />
-            <span>Who is Speaking Now? (Active Speaker Tag):</span>
+      {/* AUTOMATIC AI VOICE DIARIZATION STATUS CARD */}
+      <div className="bg-slate-900/80 border border-teal-500/30 rounded-2xl p-4 shadow-md space-y-2">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-2 text-xs font-bold text-teal-300">
+            <Sparkles className="h-4 w-4 text-teal-400" />
+            <span>Automatic AI Voice Diarization & Speaker Classification Active</span>
           </div>
-          <span className="text-[11px] text-slate-400">
-            Current Speaker: <strong className="text-teal-300 underline">{activeSpeakerName}</strong>
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] text-slate-400">
+              Live Voice Status:
+            </span>
+            <span className="px-2.5 py-0.5 rounded-full bg-teal-500/10 border border-teal-500/30 text-teal-300 font-mono text-xs font-semibold">
+              {activeDiarizedSpeaker ? `🎙️ Speaking: ${activeDiarizedSpeaker}` : '🎙️ Microphone listening & classifying voices...'}
+            </span>
+          </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2 pt-1">
-          {availableSpeakerNames.map((spk) => {
-            const isSelected = activeSpeakerName === spk;
-            return (
-              <button
-                key={spk}
-                onClick={() => setActiveSpeakerName(spk)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
-                  isSelected
-                    ? 'bg-teal-500 text-slate-950 shadow-md shadow-teal-500/20 scale-105 font-bold'
-                    : 'bg-slate-950 text-slate-300 border border-slate-800 hover:border-teal-500/40 hover:text-white'
-                }`}
-              >
-                <span>👤</span>
-                <span>{spk}</span>
-                {isSelected && <span className="h-1.5 w-1.5 rounded-full bg-slate-950" />}
-              </button>
-            );
-          })}
-
-          {showAddSpeakerInput ? (
-            <div className="flex items-center gap-1 bg-slate-950 border border-slate-700 rounded-xl p-1">
-              <input
-                type="text"
-                placeholder="Speaker Name"
-                value={newSpeakerInput}
-                onChange={(e) => setNewSpeakerInput(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleAddNewSpeaker()}
-                className="px-2 py-0.5 text-xs bg-transparent text-white focus:outline-none w-28"
-                autoFocus
-              />
-              <button
-                onClick={handleAddNewSpeaker}
-                className="p-1 text-teal-400 hover:text-teal-300"
-              >
-                <Check className="h-3.5 w-3.5" />
-              </button>
-              <button
-                onClick={() => setShowAddSpeakerInput(false)}
-                className="p-1 text-slate-400 hover:text-white"
-              >
-                <X className="h-3.5 w-3.5" />
-              </button>
-            </div>
-          ) : (
-            <button
-              onClick={() => setShowAddSpeakerInput(true)}
-              className="flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-medium bg-slate-950 border border-slate-800 text-slate-400 hover:text-teal-300 hover:border-teal-500/30 transition-colors"
-            >
-              <UserPlus className="h-3.5 w-3.5" />
-              <span>Add Speaker</span>
-            </button>
-          )}
-        </div>
+        <p className="text-[11px] text-slate-400 leading-relaxed">
+          The system automatically separates and labels distinct speakers (<strong className="text-slate-200">Speaker 1</strong>, <strong className="text-slate-200">Speaker 2</strong>, <strong className="text-slate-200">Speaker 3</strong>, etc.) from your laptop microphone. No manual selection required.
+        </p>
       </div>
 
       {/* Main Grid: Live Transcripts + Sidebar */}

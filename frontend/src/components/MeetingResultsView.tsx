@@ -108,11 +108,24 @@ export const MeetingResultsView: React.FC<MeetingResultsViewProps> = ({
             <p className="text-xs text-slate-400 flex flex-wrap items-center gap-4 pt-1">
               <span className="flex items-center gap-1.5">
                 <Calendar className="h-3.5 w-3.5 text-slate-500" />
-                {new Date(meeting.created_at).toLocaleDateString()}
+                {(() => {
+                  const raw = meeting.started_at || meeting.created_at;
+                  const normalized = raw ? (raw.endsWith('Z') || raw.includes('+') ? raw : `${raw}Z`) : '';
+                  const d = normalized ? new Date(normalized) : new Date();
+                  return isNaN(d.getTime()) ? new Date().toLocaleDateString() : d.toLocaleDateString(undefined, {
+                    year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+                  });
+                })()}
               </span>
               <span className="flex items-center gap-1.5">
                 <Clock className="h-3.5 w-3.5 text-slate-500" />
-                Duration: ~{Math.round((analytics?.duration_seconds || 120) / 60)} mins
+                Duration: {(() => {
+                  const durSecs = Math.round(analytics?.duration_seconds || (segments.length > 0 ? (segments[segments.length - 1].end_time - segments[0].start_time) : 0));
+                  if (durSecs < 60) return `${Math.max(1, durSecs)}s`;
+                  const m = Math.floor(durSecs / 60);
+                  const s = durSecs % 60;
+                  return s > 0 ? `${m}m ${s}s` : `${m}m`;
+                })()}
               </span>
               <span className="flex items-center gap-1.5">
                 <Users className="h-3.5 w-3.5 text-slate-500" />

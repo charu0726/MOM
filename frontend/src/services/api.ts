@@ -1,4 +1,6 @@
 import {
+  User,
+  AuthResponse,
   SpeakerProfile,
   VoiceMatchResult,
   MeetingDetail,
@@ -10,6 +12,44 @@ import {
 const API_BASE_URL = 'http://localhost:8000/api';
 
 export const api = {
+  // Authentication
+  async register(username: string, password: string, fullName?: string, email?: string): Promise<AuthResponse> {
+    const res = await fetch(`${API_BASE_URL}/auth/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        username,
+        password,
+        full_name: fullName,
+        email,
+      }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: 'Registration failed' }));
+      throw new Error(err.detail || 'Registration failed');
+    }
+    return res.json();
+  },
+
+  async login(username: string, password: string): Promise<AuthResponse> {
+    const res = await fetch(`${API_BASE_URL}/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: 'Login failed' }));
+      throw new Error(err.detail || 'Invalid username or password');
+    }
+    return res.json();
+  },
+
+  async getCurrentUser(username: string): Promise<User> {
+    const res = await fetch(`${API_BASE_URL}/auth/me?username=${encodeURIComponent(username)}`);
+    if (!res.ok) throw new Error('User not found');
+    return res.json();
+  },
+
   // Speakers
   async getSpeakers(): Promise<SpeakerProfile[]> {
     const res = await fetch(`${API_BASE_URL}/speakers`);

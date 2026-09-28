@@ -9,7 +9,11 @@ class UserBase(BaseModel):
     full_name: Optional[str] = None
 
 class UserCreate(UserBase):
-    password: Optional[str] = None
+    password: str
+
+class UserLogin(BaseModel):
+    username: str
+    password: str
 
 class UserResponse(UserBase):
     id: int
@@ -17,6 +21,11 @@ class UserResponse(UserBase):
 
     class Config:
         from_attributes = True
+
+class AuthResponse(BaseModel):
+    user: UserResponse
+    token: str
+    message: str
 
 # Speaker Profile Schemas
 class SpeakerProfileBase(BaseModel):

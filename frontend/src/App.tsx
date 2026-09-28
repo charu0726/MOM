@@ -5,13 +5,23 @@ import { SpeakerDashboard } from './components/SpeakerDashboard';
 import { ListenerDashboard } from './components/ListenerDashboard';
 import { MeetingResultsView } from './components/MeetingResultsView';
 import { VoiceEnrollmentModal } from './components/VoiceEnrollmentModal';
-import { MeetingDetail } from './types';
+import { AuthScreen } from './components/AuthScreen';
+import { MeetingDetail, User } from './types';
 import { api } from './services/api';
 
 export function App() {
+  const [currentUser, setCurrentUser] = useState<User | null>(() => {
+    try {
+      const stored = localStorage.getItem('mom_user');
+      return stored ? JSON.parse(stored) : null;
+    } catch {
+      return null;
+    }
+  });
+
   const [currentView, setCurrentView] = useState<'landing' | 'speaker_room' | 'listener_room' | 'results'>('landing');
   const [currentMeeting, setCurrentMeeting] = useState<MeetingDetail | null>(null);
-  const [userName, setUserName] = useState<string>('Host');
+  const [userName, setUserName] = useState<string>(() => currentUser?.full_name || currentUser?.username || 'Host');
   const [userRole, setUserRole] = useState<'HOST' | 'LISTENER'>('HOST');
   const [isVoiceModalOpen, setIsVoiceModalOpen] = useState(false);
 
@@ -20,9 +30,22 @@ export function App() {
     const params = new URLSearchParams(window.location.search);
     const code = params.get('join');
     if (code) {
-      handleJoinMeeting(code, 'Guest Listener');
+      handleJoinMeeting(code, currentUser?.full_name || currentUser?.username || 'Guest Listener');
     }
   }, []);
+
+  const handleAuthenticated = (user: User) => {
+    setCurrentUser(user);
+    setUserName(user.full_name || user.username);
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('mom_user');
+    localStorage.removeItem('mom_token');
+    setCurrentUser(null);
+    setCurrentMeeting(null);
+    setCurrentView('landing');
+  };
 
   const handleCreateMeeting = async (title: string, hostName: string) => {
     const meeting = await api.createMeeting(title, hostName);
@@ -69,6 +92,11 @@ export function App() {
     }
   };
 
+  // If user is not authenticated, show Authentication Screen (Login / Register / Guest)
+  if (!currentUser) {
+    return <AuthScreen onAuthenticated={handleAuthenticated} />;
+  }
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col selection:bg-teal-500 selection:text-white font-sans">
       {/* Global Navigation */}
@@ -80,6 +108,8 @@ export function App() {
         }}
         activeMeetingCode={currentMeeting?.code}
         role={userRole}
+        currentUser={currentUser}
+        onLogout={handleLogout}
       />
 
       {/* Main View Router */}
@@ -90,6 +120,7 @@ export function App() {
             onJoinMeeting={handleJoinMeeting}
             onOpenResults={handleOpenResults}
             onOpenVoiceEnrollment={() => setIsVoiceModalOpen(true)}
+            defaultHostName={userName}
           />
         )}
 

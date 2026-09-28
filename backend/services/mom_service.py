@@ -251,7 +251,20 @@ class MoMService:
             summary_obj.speaker_summaries_json = json.dumps(speaker_contributions)
 
         # 5. Format Standardized, Beautiful MoM Document
-        duration_min = round(max(1.0, (segments[-1].end_time - segments[0].start_time) / 60.0), 1)
+        if meeting.started_at and meeting.ended_at:
+            duration_secs = (meeting.ended_at - meeting.started_at).total_seconds()
+        elif segments:
+            duration_secs = segments[-1].end_time - segments[0].start_time
+        else:
+            duration_secs = 0.0
+
+        if duration_secs < 60:
+            duration_str = f"{max(1, int(round(duration_secs)))} seconds"
+        else:
+            mins = int(duration_secs // 60)
+            secs = int(duration_secs % 60)
+            duration_str = f"{mins} min {secs} sec" if secs > 0 else f"{mins} minutes"
+
         start_date = meeting.started_at.strftime("%B %d, %Y - %H:%M") if meeting.started_at else datetime.datetime.utcnow().strftime("%B %d, %Y - %H:%M")
         participants = db.query(Participant).filter(Participant.meeting_id == meeting_id).all()
         participant_names = ", ".join([p.display_name for p in participants]) if participants else speakers_list_str
@@ -261,8 +274,8 @@ class MoMService:
 
 **Meeting Title:** {meeting.title}  
 **Code:** {meeting.code}  
-**Date:** {start_date} UTC  
-**Duration:** ~{duration_min} minutes  
+**Date:** {start_date}  
+**Duration:** {duration_str}  
 **Participants:** {participant_names}
 
 ---

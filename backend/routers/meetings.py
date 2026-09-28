@@ -216,13 +216,13 @@ async def add_transcript_segment(
                 detected_text = stt_text
                 confidence_score = stt_conf
 
-            # 2. Speaker Diarization / Recognition via Cosine Similarity
-            if not speaker_name or speaker_name.startswith("Unknown"):
-                emb = speaker_service.extract_embedding(audio_data, sample_rate=16000)
-                profile_id, match_name, match_score = speaker_service.match_speaker(emb, db, threshold=0.72)
-                if profile_id:
-                    detected_profile_id = profile_id
-                    detected_speaker = match_name
+            # 2. Speaker Diarization & Voice Recognition (Acoustic Match / Dynamic Clustering)
+            emb = speaker_service.extract_embedding(audio_data, sample_rate=16000)
+            profile_id, match_name, match_score = speaker_service.match_or_cluster_speaker(
+                emb, meeting.id, db, threshold=0.72
+            )
+            detected_profile_id = profile_id
+            detected_speaker = match_name
 
     if not detected_text.strip():
         raise HTTPException(status_code=400, detail="No speech detected in audio chunk")

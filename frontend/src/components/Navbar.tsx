@@ -1,11 +1,14 @@
 import React from 'react';
-import { Mic, Users, Sparkles, AudioWaveform, ShieldCheck } from 'lucide-react';
+import { Mic, Users, Sparkles, AudioWaveform, ShieldCheck, User, LogOut } from 'lucide-react';
+import { User as UserType } from '../types';
 
 interface NavbarProps {
   onOpenVoiceEnrollment: () => void;
   onGoHome: () => void;
   activeMeetingCode?: string;
   role?: string;
+  currentUser?: UserType | null;
+  onLogout?: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -13,6 +16,8 @@ export const Navbar: React.FC<NavbarProps> = ({
   onGoHome,
   activeMeetingCode,
   role,
+  currentUser,
+  onLogout,
 }) => {
   return (
     <header className="sticky top-0 z-40 w-full border-b border-slate-800/80 bg-slate-950/80 backdrop-blur-md">
@@ -60,6 +65,26 @@ export const Navbar: React.FC<NavbarProps> = ({
             <Mic className="h-3.5 w-3.5 text-teal-400" />
             <span>Voice Profiles</span>
           </button>
+
+          {currentUser && (
+            <div className="flex items-center gap-2 pl-2 border-l border-slate-800">
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-xs">
+                <div className="h-5 w-5 rounded-full bg-teal-500 text-slate-950 font-bold flex items-center justify-center text-[10px]">
+                  {currentUser.username.charAt(0).toUpperCase()}
+                </div>
+                <span className="text-slate-200 font-semibold hidden sm:inline">{currentUser.full_name || currentUser.username}</span>
+              </div>
+              {onLogout && (
+                <button
+                  onClick={onLogout}
+                  title="Sign Out"
+                  className="p-2 rounded-lg bg-slate-900 hover:bg-rose-500/20 text-slate-400 hover:text-rose-300 border border-slate-800 hover:border-rose-500/30 transition-colors"
+                >
+                  <LogOut className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </header>

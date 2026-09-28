@@ -39,7 +39,12 @@ class AnalyticsService:
                 "segment_types": {}
             }
 
-        total_duration = max(1.0, segments[-1].end_time - segments[0].start_time)
+        if meeting.started_at and meeting.ended_at:
+            total_duration = max(1.0, (meeting.ended_at - meeting.started_at).total_seconds())
+        elif segments:
+            total_duration = max(1.0, segments[-1].end_time - segments[0].start_time)
+        else:
+            total_duration = 0.0
         total_words = sum(len((s.original_text or "").split()) for s in segments)
 
         # Speaker level stats

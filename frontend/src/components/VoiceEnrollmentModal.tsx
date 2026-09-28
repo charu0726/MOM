@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { X, Mic, Square, CheckCircle2, AlertCircle, Trash2, Volume2, Sparkles, UserCheck, Shield } from 'lucide-react';
 import { api } from '../services/api';
 import { SpeakerProfile, VoiceMatchResult } from '../types';
+import { WavAudioRecorder } from '../utils/wavRecorder';
 
 interface VoiceEnrollmentModalProps {
   isOpen: boolean;
@@ -25,8 +26,7 @@ export const VoiceEnrollmentModal: React.FC<VoiceEnrollmentModalProps> = ({
   const [isTesting, setIsTesting] = useState(false);
   const [activeTab, setActiveTab] = useState<'register' | 'test' | 'list'>('register');
 
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const audioChunksRef = useRef<Blob[]>([]);
+  const wavRecorderRef = useRef<WavAudioRecorder | null>(null);
   const timerRef = useRef<any>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const animationFrameRef = useRef<number | null>(null);
@@ -108,41 +108,20 @@ export const VoiceEnrollmentModal: React.FC<VoiceEnrollmentModalProps> = ({
     }
 
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const recorder = new WavAudioRecorder(30);
+      wavRecorderRef.current = recorder;
+      const stream = await recorder.start();
       startVisualizer(stream);
 
-      audioChunksRef.current = [];
-      const mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
-      mediaRecorderRef.current = mediaRecorder;
-
-      mediaRecorder.ondataavailable = (e) => {
-        if (e.data.size > 0) {
-          audioChunksRef.current.push(e.data);
-        }
-      };
-
-      mediaRecorder.onstop = async () => {
-        stopVisualizer();
-        stream.getTracks().forEach((track) => track.stop());
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
-
-        if (forTesting) {
-          await handleTestVoiceSample(audioBlob);
-        } else {
-          await handleRegisterVoiceSample(audioBlob);
-        }
-      };
-
-      mediaRecorder.start(250);
       setIsRecording(true);
       setIsTesting(forTesting);
       setRecordingSeconds(0);
 
       timerRef.current = setInterval(() => {
         setRecordingSeconds((prev) => {
-          if (prev >= 6) {
+          if (prev >= 25) {
             stopRecording();
-            return 6;
+            return 25;
           }
           return prev + 1;
         });
@@ -153,15 +132,29 @@ export const VoiceEnrollmentModal: React.FC<VoiceEnrollmentModalProps> = ({
     }
   };
 
-  const stopRecording = () => {
+  const stopRecording = async () => {
     if (timerRef.current) {
       clearInterval(timerRef.current);
       timerRef.current = null;
     }
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-      mediaRecorderRef.current.stop();
-    }
+    stopVisualizer();
     setIsRecording(false);
+
+    if (wavRecorderRef.current) {
+      const wavBlob = wavRecorderRef.current.getWavBlob();
+      wavRecorderRef.current.stop();
+      wavRecorderRef.current = null;
+
+      if (wavBlob && wavBlob.size > 2000) {
+        if (isTesting) {
+          await handleTestVoiceSample(wavBlob);
+        } else {
+          await handleRegisterVoiceSample(wavBlob);
+        }
+      } else {
+        setErrorMsg('Recorded sample was too short. Please record for at least 3-5 seconds.');
+      }
+    }
   };
 
   const handleRegisterVoiceSample = async (audioBlob: Blob) => {
@@ -303,10 +296,20 @@ export const VoiceEnrollmentModal: React.FC<VoiceEnrollmentModalProps> = ({
                 {!isRecording && (
                   <div className="absolute inset-0 flex flex-col items-center justify-center bg-slate-950/60 backdrop-blur-[1px] text-slate-400 text-xs gap-1">
                     <Volume2 className="h-5 w-5 text-teal-400/80" />
-                    <span>Click Record & speak 4-5 seconds into your laptop microphone</span>
+                    <span>Click Record & speak 10-25 seconds to capture a rich voice sample</span>
                   </div>
                 )}
               </div>
+
+              {/* Progress Bar for 25s recording */}
+              {isRecording && (
+                <div className="w-full bg-slate-950 h-2 rounded-full overflow-hidden border border-slate-800">
+                  <div 
+                    className="bg-gradient-to-r from-teal-500 to-emerald-400 h-full transition-all duration-300"
+                    style={{ width: `${Math.min(100, (recordingSeconds / 25) * 100)}%` }}
+                  />
+                </div>
+              )}
 
               {/* Recording Controls */}
               <div className="flex items-center justify-between pt-2">
@@ -315,11 +318,11 @@ export const VoiceEnrollmentModal: React.FC<VoiceEnrollmentModalProps> = ({
                     <>
                       <span className="h-2.5 w-2.5 rounded-full bg-rose-500 animate-ping" />
                       <span className="text-rose-400 font-semibold font-mono">
-                        Recording... {recordingSeconds}s / 5s
+                        Recording voice sample... {recordingSeconds}s / 25s
                       </span>
                     </>
                   ) : (
-                    <span>Speak naturally (e.g., &quot;Hello, I am testing my microphone for the meeting.&quot;)</span>
+                    <span>Speak naturally for 10-25s. You can click Stop anytime when finished.</span>
                   )}
                 </div>
 
@@ -330,7 +333,7 @@ export const VoiceEnrollmentModal: React.FC<VoiceEnrollmentModalProps> = ({
                     className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-teal-500 hover:bg-teal-400 text-slate-950 font-semibold text-xs shadow-lg shadow-teal-500/20 transition-all disabled:opacity-50"
                   >
                     <Mic className="h-4 w-4" />
-                    <span>Start Recording</span>
+                    <span>Start Recording (Up to 25s)</span>
                   </button>
                 ) : (
                   <button
@@ -338,7 +341,7 @@ export const VoiceEnrollmentModal: React.FC<VoiceEnrollmentModalProps> = ({
                     className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-rose-500 hover:bg-rose-400 text-white font-semibold text-xs shadow-lg shadow-rose-500/20 transition-all"
                   >
                     <Square className="h-4 w-4" />
-                    <span>Finish & Enroll</span>
+                    <span>Stop & Enroll Voice</span>
                   </button>
                 )}
               </div>

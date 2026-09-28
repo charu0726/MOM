@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from .database import engine, Base, get_db
 from .models import Meeting, TranscriptSegment, Participant
-from .routers import speakers, meetings, mom
+from .routers import speakers, meetings, mom, auth
 from .websocket_manager import manager
 from .services.audio_service import AudioService
 from .services.speaker_service import speaker_service
@@ -35,6 +35,7 @@ app.add_middleware(
 )
 
 # Include Routers
+app.include_router(auth.router)
 app.include_router(speakers.router)
 app.include_router(meetings.router)
 app.include_router(mom.router)

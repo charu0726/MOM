@@ -11,6 +11,7 @@ interface LandingPageProps {
   onJoinMeeting: (code: string, displayName: string) => Promise<void>;
   onOpenResults: (code: string) => void;
   onOpenVoiceEnrollment: () => void;
+  defaultHostName?: string;
 }
 
 export const LandingPage: React.FC<LandingPageProps> = ({
@@ -18,11 +19,12 @@ export const LandingPage: React.FC<LandingPageProps> = ({
   onJoinMeeting,
   onOpenResults,
   onOpenVoiceEnrollment,
+  defaultHostName,
 }) => {
   const [meetingTitle, setMeetingTitle] = useState('');
-  const [hostName, setHostName] = useState('Host');
+  const [hostName, setHostName] = useState(defaultHostName || 'Host');
   const [joinCode, setJoinCode] = useState('');
-  const [listenerName, setListenerName] = useState('');
+  const [listenerName, setListenerName] = useState(defaultHostName || '');
   const [isCreating, setIsCreating] = useState(false);
   const [isJoining, setIsJoining] = useState(false);
   const [recentMeetings, setRecentMeetings] = useState<MeetingDetail[]>([]);
